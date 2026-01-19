@@ -1,0 +1,225 @@
+import { useState } from 'react';
+import { ChevronDown, ChevronRight, Plus, Trash2, GripVertical } from 'lucide-react';
+
+/**
+ * Inline editable input component
+ */
+function InlineInput({ value, onChange, type = 'text', className = '', placeholder = '' }) {
+  return (
+    <input
+      type={type}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={`inline-edit bg-transparent ${className}`}
+      placeholder={placeholder}
+      step={type === 'number' ? '0.01' : undefined}
+      min={type === 'number' ? '0' : undefined}
+    />
+  );
+}
+
+/**
+ * Assignment row component with inline editing
+ */
+function AssignmentRow({ assignment, onUpdate, onDelete }) {
+  const handleChange = (field, value) => {
+    onUpdate({ ...assignment, [field]: value });
+  };
+
+  const grade = assignment.pointsPossible > 0 && assignment.pointsEarned !== '' && assignment.pointsEarned !== null
+    ? ((parseFloat(assignment.pointsEarned) / parseFloat(assignment.pointsPossible)) * 100).toFixed(1)
+    : null;
+
+  return (
+    <div className="flex items-center gap-3 py-2 px-4 border-b border-[#EEEEEE] last:border-b-0 hover:bg-[#FAFAFA] group">
+      <GripVertical size={14} className="text-[#CCCCCC] opacity-0 group-hover:opacity-100 transition-opacity cursor-grab" />
+      
+      <InlineInput
+        value={assignment.name}
+        onChange={(v) => handleChange('name', v)}
+        className="flex-1 text-sm font-medium"
+        placeholder="Assignment name"
+      />
+      
+      <div className="flex items-center gap-1">
+        <InlineInput
+          value={assignment.pointsEarned ?? ''}
+          onChange={(v) => handleChange('pointsEarned', v === '' ? null : parseFloat(v))}
+          type="number"
+          className="w-16 text-right font-mono-grades text-sm"
+          placeholder="—"
+        />
+        <span className="text-[#545454] text-sm">/</span>
+        <InlineInput
+          value={assignment.pointsPossible}
+          onChange={(v) => handleChange('pointsPossible', parseFloat(v) || 0)}
+          type="number"
+          className="w-16 text-left font-mono-grades text-sm"
+          placeholder="100"
+        />
+      </div>
+
+      <div className="w-16 text-right">
+        {grade !== null ? (
+          <span className={`font-mono-grades text-sm font-semibold ${
+            parseFloat(grade) >= 90 ? 'text-[#05A357]' : 
+            parseFloat(grade) >= 80 ? 'text-[#276EF1]' : 
+            parseFloat(grade) >= 70 ? 'text-[#545454]' : 'text-[#E11D48]'
+          }`}>
+            {grade}%
+          </span>
+        ) : (
+          <span className="text-[#CCCCCC] text-sm">—</span>
+        )}
+      </div>
+
+      <button
+        onClick={onDelete}
+        className="p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[#EEEEEE] rounded"
+        aria-label="Delete assignment"
+      >
+        <Trash2 size={14} className="text-[#545454]" />
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Category Card component with expandable assignments list
+ */
+export function CategoryCard({ category, onUpdate, onDelete, categoryGrade }) {
+  const [isExpanded, setIsExpanded] = useState(true);
+
+  const handleCategoryChange = (field, value) => {
+    onUpdate({ ...category, [field]: value });
+  };
+
+  const handleAssignmentUpdate = (index, updatedAssignment) => {
+    const newAssignments = [...(category.assignments || [])];
+    newAssignments[index] = updatedAssignment;
+    onUpdate({ ...category, assignments: newAssignments });
+  };
+
+  const handleAssignmentDelete = (index) => {
+    const newAssignments = (category.assignments || []).filter((_, i) => i !== index);
+    onUpdate({ ...category, assignments: newAssignments });
+  };
+
+  const handleAddAssignment = () => {
+    const newAssignment = {
+      id: `assignment_${Date.now()}`,
+      name: 'New Assignment',
+      pointsEarned: null,
+      pointsPossible: 100
+    };
+    onUpdate({ 
+      ...category, 
+      assignments: [...(category.assignments || []), newAssignment] 
+    });
+  };
+
+  const assignments = category.assignments || [];
+  const gradedCount = assignments.filter(a => a.pointsEarned !== null && a.pointsEarned !== '').length;
+
+  return (
+    <div className="card rounded">
+      {/* Category Header */}
+      <div className="flex items-center gap-3 p-4 border-b border-[#EEEEEE]">
+        <button 
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="p-1 hover:bg-[#EEEEEE] rounded transition-colors"
+          aria-label={isExpanded ? 'Collapse' : 'Expand'}
+        >
+          {isExpanded ? (
+            <ChevronDown size={16} className="text-[#000000]" />
+          ) : (
+            <ChevronRight size={16} className="text-[#000000]" />
+          )}
+        </button>
+
+        <div className="flex-1 flex items-center gap-4">
+          <InlineInput
+            value={category.name}
+            onChange={(v) => handleCategoryChange('name', v)}
+            className="text-base font-black tracking-tight"
+            placeholder="Category name"
+          />
+          
+          <div className="flex items-center gap-1">
+            <InlineInput
+              value={category.weight}
+              onChange={(v) => handleCategoryChange('weight', parseFloat(v) || 0)}
+              type="number"
+              className="w-14 text-right font-mono-grades text-sm font-semibold"
+              placeholder="0"
+            />
+            <span className="text-[#545454] text-sm font-semibold">%</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4">
+          {/* Category grade */}
+          <div className="text-right">
+            {categoryGrade !== null ? (
+              <span className={`font-mono-grades text-lg font-black ${
+                categoryGrade >= 90 ? 'text-[#05A357]' : 
+                categoryGrade >= 80 ? 'text-[#276EF1]' : 
+                categoryGrade >= 70 ? 'text-[#545454]' : 'text-[#E11D48]'
+              }`}>
+                {categoryGrade.toFixed(1)}%
+              </span>
+            ) : (
+              <span className="text-[#CCCCCC] font-mono-grades text-lg">—</span>
+            )}
+          </div>
+
+          {/* Assignment count badge */}
+          <div className="bg-[#EEEEEE] px-2 py-1 rounded text-xs font-semibold text-[#545454]">
+            {gradedCount}/{assignments.length}
+          </div>
+
+          <button
+            onClick={onDelete}
+            className="p-2 hover:bg-[#EEEEEE] rounded transition-colors"
+            aria-label="Delete category"
+          >
+            <Trash2 size={16} className="text-[#545454]" />
+          </button>
+        </div>
+      </div>
+
+      {/* Assignments List */}
+      {isExpanded && (
+        <div>
+          {assignments.length > 0 ? (
+            <div>
+              {assignments.map((assignment, index) => (
+                <AssignmentRow
+                  key={assignment.id}
+                  assignment={assignment}
+                  onUpdate={(updated) => handleAssignmentUpdate(index, updated)}
+                  onDelete={() => handleAssignmentDelete(index)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="p-4 text-center text-[#545454] text-sm">
+              No assignments yet
+            </div>
+          )}
+
+          {/* Add Assignment Button */}
+          <button
+            onClick={handleAddAssignment}
+            className="w-full flex items-center justify-center gap-2 p-3 text-sm font-semibold text-[#545454] hover:bg-[#FAFAFA] border-t border-[#EEEEEE] transition-colors"
+          >
+            <Plus size={14} />
+            Add Assignment
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default CategoryCard;
