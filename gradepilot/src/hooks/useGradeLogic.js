@@ -119,19 +119,21 @@ export function useGradeLogic(categories, targetGrade, gradeScale) {
   }, [requiredAverage, currentGrade, targetGrade]);
 
   // Get letter grade from percentage
-  const getLetterGrade = (percentage) => {
-    if (percentage === null || percentage === undefined) return '-';
-    if (percentage >= gradeScale.A) return 'A';
-    if (percentage >= gradeScale.B) return 'B';
-    if (percentage >= gradeScale.C) return 'C';
-    if (percentage >= gradeScale.D) return 'D';
-    return 'F';
-  };
+  const getLetterGrade = useMemo(() => {
+    return (percentage) => {
+      if (percentage === null || percentage === undefined) return '-';
+      if (percentage >= gradeScale.A) return 'A';
+      if (percentage >= gradeScale.B) return 'B';
+      if (percentage >= gradeScale.C) return 'C';
+      if (percentage >= gradeScale.D) return 'D';
+      return 'F';
+    };
+  }, [gradeScale]);
 
   // Current letter grade
   const currentLetterGrade = useMemo(() => {
     return getLetterGrade(currentGrade);
-  }, [currentGrade, gradeScale]);
+  }, [currentGrade, getLetterGrade]);
 
   // Performance tier calculation
   const performanceTier = useMemo(() => {

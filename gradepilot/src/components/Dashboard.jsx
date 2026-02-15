@@ -1,13 +1,16 @@
-import { Plus, RotateCcw, Settings, TrendingUp, Award, BookOpen, Info, Target, BarChart3, Zap } from 'lucide-react';
+import { Plus, RotateCcw, Settings, TrendingUp, Award, BookOpen, Info, Target, BarChart3, Zap, LogOut } from 'lucide-react';
 import { useGradePilotStore } from '../hooks/usePersistentState';
 import { useGradeLogic } from '../hooks/useGradeLogic';
+import { useSupabaseGrades } from '../hooks/useSupabaseGrades';
 import { CategoryCard } from './CategoryCard';
 import { GradeForecast } from './GradeForecast';
+import { DashboardSkeleton } from './LoadingSkeletons';
+import { useOptionalAuth } from '../hooks/useAuth';
 import { useState } from 'react';
 
 /**
  * Setup Progress Card
- * Shows when total weight < 100%, uses a soft info theme instead of red error bar
+ * Shows when total weight < 100%, uses a soft info theme
  */
 function SetupProgressCard({ totalWeight, isValid }) {
   if (isValid) return null;
@@ -30,7 +33,6 @@ function SetupProgressCard({ totalWeight, isValid }) {
               : `Your category weights total ${totalWeight.toFixed(1)}%. Add ${missing.toFixed(1)}% more weight to complete your course setup.`
             }
           </p>
-          {/* Progress bar */}
           <div className="h-2 bg-amber-200 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-500 ${isOver ? 'bg-amber-500' : 'bg-amber-400'}`}
@@ -68,12 +70,11 @@ function PerformanceBadge({ tier }) {
 }
 
 /**
- * Mini Sparkline SVG for grade trend visualization
+ * Mini Progress Ring SVG
  */
 function MiniSparkline({ value, size = 80 }) {
   if (value === null) return null;
-  
-  // Generate a simple arc / progress ring
+
   const radius = (size - 8) / 2;
   const cx = size / 2;
   const cy = size / 2;
@@ -83,42 +84,24 @@ function MiniSparkline({ value, size = 80 }) {
 
   return (
     <svg width={size} height={size} className="absolute inset-0 m-auto opacity-15">
-      {/* Background ring */}
+      <circle cx={cx} cy={cy} r={radius} fill="none" stroke="currentColor" strokeWidth="4" opacity="0.2" />
       <circle
-        cx={cx}
-        cy={cy}
-        r={radius}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="4"
-        opacity="0.2"
-      />
-      {/* Progress ring */}
-      <circle
-        cx={cx}
-        cy={cy}
-        r={radius}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="4"
-        strokeDasharray={circumference}
-        strokeDashoffset={offset}
-        strokeLinecap="round"
-        transform={`rotate(-90 ${cx} ${cy})`}
-        className="transition-all duration-700"
+        cx={cx} cy={cy} r={radius} fill="none" stroke="currentColor" strokeWidth="4"
+        strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round"
+        transform={`rotate(-90 ${cx} ${cy})`} className="transition-all duration-700"
       />
     </svg>
   );
 }
 
 /**
- * Enhanced Current Grade Card with large text and progress ring
+ * Enhanced Current Grade Card
  */
 function CurrentGradeCard({ currentGrade, currentLetterGrade }) {
   const highlight = currentGrade !== null && currentGrade >= 90;
 
   return (
-    <div className="card rounded-xl p-5 relative overflow-hidden col-span-2 sm:col-span-2 lg:col-span-1">
+    <div className="card rounded-xl p-5 relative overflow-hidden">
       <MiniSparkline value={currentGrade} size={100} />
       <div className="relative z-10">
         <div className="text-xs font-semibold text-[#545454] uppercase tracking-wide mb-1">
@@ -229,8 +212,7 @@ function SettingsModal({ gradeScale, onScaleChange, onClose, onReset }) {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-xl max-w-md w-full p-6">
         <h2 className="text-xl font-black mb-6">Settings</h2>
-        
-        {/* Grade Scale */}
+
         <div className="mb-6">
           <label className="block text-xs font-semibold text-[#545454] uppercase tracking-wide mb-3">
             Grade Scale Thresholds
@@ -252,7 +234,6 @@ function SettingsModal({ gradeScale, onScaleChange, onClose, onReset }) {
           </div>
         </div>
 
-        {/* Reset Data */}
         <div className="border-t border-[#EEEEEE] pt-6 mb-6">
           <label className="block text-xs font-semibold text-[#545454] uppercase tracking-wide mb-3">
             Danger Zone
@@ -266,10 +247,7 @@ function SettingsModal({ gradeScale, onScaleChange, onClose, onReset }) {
           </button>
         </div>
 
-        <button
-          onClick={onClose}
-          className="w-full btn-primary rounded-lg"
-        >
+        <button onClick={onClose} className="w-full btn-primary rounded-lg">
           Done
         </button>
       </div>
@@ -278,18 +256,45 @@ function SettingsModal({ gradeScale, onScaleChange, onClose, onReset }) {
 }
 
 /**
+ * Error Toast
+ */
+function ErrorToast({ message, onDismiss }) {
+  if (!message) return null;
+  return (
+    <div className="fixed bottom-6 right-6 z-50 max-w-sm animate-in">
+      <div className="bg-red-600 text-white px-5 py-3 rounded-xl shadow-lg flex items-center gap-3">
+        <span className="text-sm font-medium flex-1">{message}</span>
+        <button onClick={onDismiss} className="text-white/80 hover:text-white font-bold text-lg leading-none">&times;</button>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Main Dashboard Component
+ * Supports two modes:
+ * 1. Supabase mode — when VITE_SUPABASE_URL is set, data is fetched from Supabase
+ * 2. Local mode  — fallback to localStorage via usePersistentState
  */
 export function Dashboard() {
+  // Local state (always available as fallback)
+  const localStore = useGradePilotStore();
+
+  // Supabase state (only active when env vars are set)
+  const supabaseStore = useSupabaseGrades();
+
+  const useSupabase = supabaseStore.supabaseConfigured;
+
+  // Pick the active data source
+  const categories = useSupabase ? supabaseStore.categories : localStore.categories;
+
   const {
-    categories,
-    setCategories,
     targetGrade,
     setTargetGrade,
     gradeScale,
     setGradeScale,
     resetAllData
-  } = useGradePilotStore();
+  } = localStore;
 
   const {
     totalWeight,
@@ -308,27 +313,50 @@ export function Dashboard() {
   } = useGradeLogic(categories, targetGrade, gradeScale);
 
   const [showSettings, setShowSettings] = useState(false);
+  const [toastError, setToastError] = useState(null);
 
-  // Category CRUD operations
+  // Show error toast when supabase has an error
+  const displayError = supabaseStore.error || null;
+  if (displayError && displayError !== toastError) {
+    // We don't want to call setToastError during render — so use a timeout
+    setTimeout(() => setToastError(displayError), 0);
+  }
+
+  // Auth (optional — returns null when not inside AuthProvider)
+  const auth = useOptionalAuth();
+
+  // Category CRUD
   const handleAddCategory = () => {
-    const newCategory = {
-      id: `cat_${Date.now()}`,
-      name: 'New Category',
-      weight: 0,
-      assignments: []
-    };
-    setCategories([...categories, newCategory]);
+    if (useSupabase) {
+      supabaseStore.handleAddCategory();
+    } else {
+      const newCategory = {
+        id: `cat_${Date.now()}`,
+        name: 'New Category',
+        weight: 0,
+        assignments: []
+      };
+      localStore.setCategories([...categories, newCategory]);
+    }
   };
 
   const handleUpdateCategory = (index, updatedCategory) => {
-    const newCategories = [...categories];
-    newCategories[index] = updatedCategory;
-    setCategories(newCategories);
+    if (useSupabase) {
+      supabaseStore.handleUpdateCategory(index, updatedCategory);
+    } else {
+      const newCategories = [...categories];
+      newCategories[index] = updatedCategory;
+      localStore.setCategories(newCategories);
+    }
   };
 
   const handleDeleteCategory = (index) => {
     if (window.confirm('Delete this category and all its assignments?')) {
-      setCategories(categories.filter((_, i) => i !== index));
+      if (useSupabase) {
+        supabaseStore.handleDeleteCategory(index);
+      } else {
+        localStore.setCategories(categories.filter((_, i) => i !== index));
+      }
     }
   };
 
@@ -338,6 +366,11 @@ export function Dashboard() {
       setShowSettings(false);
     }
   };
+
+  // Show loading skeleton when Supabase is configured and data is loading
+  if (useSupabase && supabaseStore.loading) {
+    return <DashboardSkeleton />;
+  }
 
   // Show empty state if no categories
   if (categories.length === 0) {
@@ -358,7 +391,7 @@ export function Dashboard() {
               <p className="text-xs text-[#545454]">Grade Tracking Dashboard</p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-4">
             <PerformanceBadge tier={performanceTier} />
             {/* Add Category — primary outline button */}
@@ -376,29 +409,38 @@ export function Dashboard() {
             >
               <Settings size={20} className="text-[#000000]" />
             </button>
+            {auth && (
+              <button
+                onClick={() => auth.signOut()}
+                className="p-2 hover:bg-[#EEEEEE] rounded-lg transition-colors"
+                aria-label="Sign out"
+                title="Sign out"
+              >
+                <LogOut size={20} className="text-[#545454]" />
+              </button>
+            )}
           </div>
         </div>
       </header>
 
       {/* Main Content — 3-column desktop grid */}
       <main className="max-w-7xl mx-auto px-4 lg:px-8 py-8">
-        {/* Setup Progress Card (replaces red weight check bar) */}
+        {/* Setup Progress Card */}
         <SetupProgressCard totalWeight={totalWeight} isValid={isWeightValid} />
 
         <div className="grid lg:grid-cols-3 gap-6">
-          {/* Column 1 — Stats & Categories */}
+          {/* Column 1 — Stats */}
           <div className="lg:col-span-1 space-y-6 order-2 lg:order-1">
-            {/* Stats Cards */}
             <CurrentGradeCard currentGrade={currentGrade} currentLetterGrade={currentLetterGrade} />
 
-            <StatCard 
-              label="Weight Used" 
+            <StatCard
+              label="Weight Used"
               value={weightUsed.toFixed(0)}
               suffix="%"
               subtext={`${remainingWeight.toFixed(0)}% remaining`}
             />
-            <StatCard 
-              label="Categories" 
+            <StatCard
+              label="Categories"
               value={categories.length}
               subtext={`${categories.reduce((sum, c) => sum + (c.assignments?.length || 0), 0)} assignments`}
             />
@@ -429,7 +471,6 @@ export function Dashboard() {
 
           {/* Column 2 — Categories (main feed) */}
           <div className="lg:col-span-1 space-y-6 order-1 lg:order-2">
-            {/* Categories Header (mobile add button) */}
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-black">Course Categories</h2>
               <button
@@ -441,7 +482,6 @@ export function Dashboard() {
               </button>
             </div>
 
-            {/* Category Cards */}
             <div className="space-y-4">
               {categories.map((category, index) => (
                 <CategoryCard
@@ -482,6 +522,9 @@ export function Dashboard() {
           onReset={handleResetAll}
         />
       )}
+
+      {/* Error Toast */}
+      <ErrorToast message={toastError} onDismiss={() => setToastError(null)} />
     </div>
   );
 }

@@ -20,13 +20,15 @@ export function GradeForecast({
   const [whatIfScore, setWhatIfScore] = useState(85);
   
   // Get grade letter for target
-  const getTargetLetter = (target) => {
-    if (target >= gradeScale.A) return 'A';
-    if (target >= gradeScale.B) return 'B';
-    if (target >= gradeScale.C) return 'C';
-    if (target >= gradeScale.D) return 'D';
-    return 'F';
-  };
+  const getTargetLetter = useMemo(() => {
+    return (target) => {
+      if (target >= gradeScale.A) return 'A';
+      if (target >= gradeScale.B) return 'B';
+      if (target >= gradeScale.C) return 'C';
+      if (target >= gradeScale.D) return 'D';
+      return 'F';
+    };
+  }, [gradeScale]);
 
   // Calculate What-If required average when the slider value changes
   const whatIfResult = useMemo(() => {
@@ -88,7 +90,7 @@ export function GradeForecast({
         ? `You can drop ${margin.toFixed(1)} percentage points before falling to a ${nextThreshold.letter}.`
         : `You're right at the ${currentLetter} boundary — no room to spare!`
     };
-  }, [currentGrade, gradeScale, remainingWeight, pointsEarned]);
+  }, [currentGrade, gradeScale, remainingWeight, getTargetLetter]);
 
   // Preset target buttons
   const presets = [
