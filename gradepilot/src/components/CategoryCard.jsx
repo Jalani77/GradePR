@@ -31,7 +31,7 @@ function AssignmentRow({ assignment, onUpdate, onDelete }) {
     : null;
 
   return (
-    <div className="flex items-center gap-3 py-2 px-4 border-b border-[#EEEEEE] last:border-b-0 hover:bg-[#FAFAFA] group">
+    <div className="flex items-center gap-3 py-2.5 px-4 border-b border-[#EEEEEE] last:border-b-0 hover:bg-[#F7F7F7] group transition-colors duration-150">
       <GripVertical size={14} className="text-[#CCCCCC] opacity-0 group-hover:opacity-100 transition-opacity cursor-grab" />
       
       <InlineInput
@@ -75,7 +75,7 @@ function AssignmentRow({ assignment, onUpdate, onDelete }) {
 
       <button
         onClick={onDelete}
-        className="p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[#EEEEEE] rounded"
+        className="p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[#EEEEEE] rounded-md"
         aria-label="Delete assignment"
       >
         <Trash2 size={14} className="text-[#545454]" />
@@ -86,6 +86,9 @@ function AssignmentRow({ assignment, onUpdate, onDelete }) {
 
 /**
  * Category Card component with expandable assignments list
+ * - Rounded corners and hover effect on the card itself
+ * - Conditional category grade coloring: <70% = soft orange, >90% = green
+ * - '+' icon button instead of text link for "Add Assignment"
  */
 export function CategoryCard({ category, onUpdate, onDelete, categoryGrade }) {
   const [isExpanded, setIsExpanded] = useState(true);
@@ -121,13 +124,22 @@ export function CategoryCard({ category, onUpdate, onDelete, categoryGrade }) {
   const assignments = category.assignments || [];
   const gradedCount = assignments.filter(a => a.pointsEarned !== null && a.pointsEarned !== '').length;
 
+  // Conditional category grade color
+  const getCategoryGradeColor = (grade) => {
+    if (grade === null) return 'text-[#CCCCCC]';
+    if (grade >= 90) return 'text-[#05A357]';       // green for 90%+
+    if (grade >= 80) return 'text-[#276EF1]';       // blue for 80-89%
+    if (grade >= 70) return 'text-[#545454]';       // neutral for 70-79%
+    return 'text-orange-500';                        // soft orange for <70%
+  };
+
   return (
-    <div className="card rounded">
+    <div className="card rounded-xl hover:shadow-md transition-shadow duration-200">
       {/* Category Header */}
       <div className="flex items-center gap-3 p-4 border-b border-[#EEEEEE]">
         <button 
           onClick={() => setIsExpanded(!isExpanded)}
-          className="p-1 hover:bg-[#EEEEEE] rounded transition-colors"
+          className="p-1 hover:bg-[#EEEEEE] rounded-md transition-colors"
           aria-label={isExpanded ? 'Collapse' : 'Expand'}
         >
           {isExpanded ? (
@@ -157,15 +169,11 @@ export function CategoryCard({ category, onUpdate, onDelete, categoryGrade }) {
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          {/* Category grade */}
+        <div className="flex items-center gap-3">
+          {/* Category grade — conditional color */}
           <div className="text-right">
             {categoryGrade !== null ? (
-              <span className={`font-mono-grades text-lg font-black ${
-                categoryGrade >= 90 ? 'text-[#05A357]' : 
-                categoryGrade >= 80 ? 'text-[#276EF1]' : 
-                categoryGrade >= 70 ? 'text-[#545454]' : 'text-[#E11D48]'
-              }`}>
+              <span className={`font-mono-grades text-lg font-black ${getCategoryGradeColor(categoryGrade)}`}>
                 {categoryGrade.toFixed(1)}%
               </span>
             ) : (
@@ -174,16 +182,26 @@ export function CategoryCard({ category, onUpdate, onDelete, categoryGrade }) {
           </div>
 
           {/* Assignment count badge */}
-          <div className="bg-[#EEEEEE] px-2 py-1 rounded text-xs font-semibold text-[#545454]">
+          <div className="bg-[#EEEEEE] px-2 py-1 rounded-md text-xs font-semibold text-[#545454]">
             {gradedCount}/{assignments.length}
           </div>
 
+          {/* Add assignment — subtle '+' icon button */}
+          <button
+            onClick={handleAddAssignment}
+            className="p-2 hover:bg-blue-50 rounded-md transition-colors group/add"
+            aria-label="Add assignment"
+            title="Add assignment"
+          >
+            <Plus size={16} className="text-[#545454] group-hover/add:text-[#276EF1] transition-colors" />
+          </button>
+
           <button
             onClick={onDelete}
-            className="p-2 hover:bg-[#EEEEEE] rounded transition-colors"
+            className="p-2 hover:bg-red-50 rounded-md transition-colors group/del"
             aria-label="Delete category"
           >
-            <Trash2 size={16} className="text-[#545454]" />
+            <Trash2 size={16} className="text-[#545454] group-hover/del:text-[#E11D48] transition-colors" />
           </button>
         </div>
       </div>
@@ -204,18 +222,9 @@ export function CategoryCard({ category, onUpdate, onDelete, categoryGrade }) {
             </div>
           ) : (
             <div className="p-4 text-center text-[#545454] text-sm">
-              No assignments yet
+              No assignments yet — click the <Plus size={12} className="inline text-[#276EF1]" /> button to add one
             </div>
           )}
-
-          {/* Add Assignment Button */}
-          <button
-            onClick={handleAddAssignment}
-            className="w-full flex items-center justify-center gap-2 p-3 text-sm font-semibold text-[#545454] hover:bg-[#FAFAFA] border-t border-[#EEEEEE] transition-colors"
-          >
-            <Plus size={14} />
-            Add Assignment
-          </button>
         </div>
       )}
     </div>
