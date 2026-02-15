@@ -1,4 +1,8 @@
 import { Dashboard } from './components/Dashboard';
+import { LoginPage } from './components/LoginPage';
+import { DashboardSkeleton } from './components/LoadingSkeleton';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { AuthProvider, useAuth } from './hooks/useAuth';
 
 /**
  * GradePilot - Grade Tracking Dashboard
@@ -7,19 +11,39 @@ import { Dashboard } from './components/Dashboard';
  * - React (Vite)
  * - Tailwind CSS
  * - Uber "Base" Design System
- * - Local-first state management with localStorage persistence
+ * - Supabase for authentication and data persistence
  * 
  * Features:
  * - Grade Forecast Engine (What-If Calculator)
  * - Category Management with inline editing
  * - Visual Analytics (weight check, performance badges)
- * - Persistent localStorage data
+ * - Real-time Supabase sync
+ * - User authentication with Google OAuth
  */
+
+function AppContent() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <DashboardSkeleton />;
+  }
+
+  if (!user) {
+    return <LoginPage />;
+  }
+
+  return <Dashboard />;
+}
+
 function App() {
   return (
-    <div className="antialiased">
-      <Dashboard />
-    </div>
+    <ErrorBoundary>
+      <div className="antialiased">
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </div>
+    </ErrorBoundary>
   );
 }
 

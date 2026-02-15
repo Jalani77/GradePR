@@ -1,29 +1,48 @@
-import { Plus, RotateCcw, Settings, TrendingUp, Award, BookOpen } from 'lucide-react';
-import { useGradePilotStore } from '../hooks/usePersistentState';
+import { Plus, RotateCcw, Settings, TrendingUp, Award, BookOpen, LogOut } from 'lucide-react';
+import { useSupabaseGrades } from '../hooks/useSupabaseData';
 import { useGradeLogic } from '../hooks/useGradeLogic';
+import { useAuth } from '../hooks/useAuth';
 import { CategoryCard } from './CategoryCard';
 import { GradeForecast } from './GradeForecast';
+import { DashboardSkeleton } from './LoadingSkeleton';
 import { useState } from 'react';
 
 /**
- * Global Weight Check Bar
- * Shows warning when total weight != 100%
+ * Setup Progress Card
+ * Shows info card when total weight is less than 100%
  */
-function WeightCheckBar({ totalWeight, isValid }) {
-  if (isValid) {
-    return (
-      <div className="h-1 w-full bg-[#000000]" />
-    );
+function SetupProgressCard({ totalWeight, isValid }) {
+  if (isValid || totalWeight >= 100) {
+    return null;
   }
 
+  const progress = (totalWeight / 100) * 100;
+  const missing = 100 - totalWeight;
+
   return (
-    <div className="bg-[#E11D48] text-white px-4 py-2 flex items-center justify-between">
-      <span className="text-sm font-semibold">
-        Weight Check: {totalWeight.toFixed(1)}% — {totalWeight < 100 ? `Missing ${(100 - totalWeight).toFixed(1)}%` : `${(totalWeight - 100).toFixed(1)}% over`}
-      </span>
-      <span className="text-xs font-medium opacity-80">
-        Total should equal 100%
-      </span>
+    <div className="bg-gradient-to-r from-[#EFF6FF] to-[#FEF3C7] border border-[#DBEAFE] rounded-lg p-5 mb-6">
+      <div className="flex items-start gap-4">
+        <div className="w-10 h-10 bg-[#3B82F6] rounded-full flex items-center justify-center flex-shrink-0">
+          <Settings size={20} className="text-white" />
+        </div>
+        <div className="flex-1">
+          <h3 className="font-black text-sm mb-2 text-[#1E40AF]">Setup Progress</h3>
+          <p className="text-sm text-[#475569] mb-3">
+            Your category weights add up to {totalWeight.toFixed(1)}%. 
+            Add {missing.toFixed(1)}% more to complete your grade setup.
+          </p>
+          {/* Progress Bar */}
+          <div className="h-2 bg-white rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-[#3B82F6] transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <div className="mt-2 text-xs text-[#64748B]">
+            {progress.toFixed(0)}% complete
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -51,17 +70,43 @@ function PerformanceBadge({ tier }) {
 /**
  * Stats Card Component
  */
-function StatCard({ label, value, suffix = '', subtext, highlight = false }) {
+function StatCard({ label, value, suffix = '', subtext, highlight = false, large = false, showProgress = false, progressValue = 0 }) {
   return (
-    <div className="card rounded p-4">
-      <div className="text-xs font-semibold text-[#545454] uppercase tracking-wide mb-1">
+    <div className="card rounded p-6 relative overflow-hidden">
+      {/* Background progress ring/circle for large cards */}
+      {large && showProgress && (
+        <div className="absolute top-0 right-0 w-32 h-32 opacity-10">
+          <svg viewBox="0 0 100 100" className="transform -rotate-90">
+            <circle
+              cx="50"
+              cy="50"
+              r="40"
+              fill="none"
+              stroke="#EEEEEE"
+              strokeWidth="8"
+            />
+            <circle
+              cx="50"
+              cy="50"
+              r="40"
+              fill="none"
+              stroke="#05A357"
+              strokeWidth="8"
+              strokeDasharray={`${progressValue * 2.51} 251`}
+              className="transition-all duration-500"
+            />
+          </svg>
+        </div>
+      )}
+      
+      <div className="text-xs font-semibold text-[#545454] uppercase tracking-wide mb-2">
         {label}
       </div>
-      <div className={`font-mono-grades text-3xl font-black ${highlight ? 'text-[#05A357]' : 'text-[#000000]'}`}>
+      <div className={`font-mono-grades ${large ? 'text-5xl' : 'text-3xl'} font-black ${highlight ? 'text-[#05A357]' : 'text-[#000000]'} relative z-10`}>
         {value}{suffix}
       </div>
       {subtext && (
-        <div className="text-xs text-[#545454] mt-1">{subtext}</div>
+        <div className="text-xs text-[#545454] mt-2">{subtext}</div>
       )}
     </div>
   );
@@ -72,22 +117,56 @@ function StatCard({ label, value, suffix = '', subtext, highlight = false }) {
  */
 function EmptyState({ onCreateCategory }) {
   return (
-    <div className="min-h-screen flex items-center justify-center p-8">
-      <div className="text-center max-w-md">
-        <div className="w-20 h-20 bg-[#000000] rounded-full flex items-center justify-center mx-auto mb-6">
+    <div className="min-h-screen flex items-center justify-center p-8 bg-gradient-to-br from-[#FAFAFA] to-[#FFFFFF]">
+      <div className="text-center max-w-2xl">
+        <div className="w-20 h-20 bg-gradient-to-br from-[#000000] to-[#545454] rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
           <BookOpen size={32} className="text-white" />
         </div>
-        <h1 className="text-3xl font-black mb-2">Welcome to GradePilot</h1>
-        <p className="text-[#545454] mb-8">
-          Your personal grade tracking dashboard. Start by creating your first course category to begin tracking your academic progress.
+        <h1 className="text-4xl font-black mb-3">Welcome to GradePilot</h1>
+        <p className="text-[#545454] text-lg mb-10">
+          Your intelligent grade tracking companion. Start by creating your first course category.
         </p>
+        
         <button
           onClick={onCreateCategory}
-          className="btn-primary rounded inline-flex items-center gap-2"
+          className="btn-primary rounded-lg inline-flex items-center gap-2 mb-12 shadow-lg"
         >
-          <Plus size={16} />
+          <Plus size={18} />
           Create Your First Category
         </button>
+
+        {/* Feature Cards */}
+        <div className="grid md:grid-cols-3 gap-4 mt-8">
+          <div className="bg-white card rounded-lg p-5 text-left">
+            <div className="w-10 h-10 bg-[#05A357] rounded-lg flex items-center justify-center mb-3">
+              <TrendingUp size={20} className="text-white" />
+            </div>
+            <h3 className="font-black text-sm mb-2">Track Progress</h3>
+            <p className="text-xs text-[#545454]">
+              Monitor your grades across all categories in real-time
+            </p>
+          </div>
+          
+          <div className="bg-white card rounded-lg p-5 text-left">
+            <div className="w-10 h-10 bg-[#276EF1] rounded-lg flex items-center justify-center mb-3">
+              <Award size={20} className="text-white" />
+            </div>
+            <h3 className="font-black text-sm mb-2">Forecast Grades</h3>
+            <p className="text-xs text-[#545454]">
+              See what you need to achieve your target grade
+            </p>
+          </div>
+          
+          <div className="bg-white card rounded-lg p-5 text-left">
+            <div className="w-10 h-10 bg-[#000000] rounded-lg flex items-center justify-center mb-3">
+              <BookOpen size={20} className="text-white" />
+            </div>
+            <h3 className="font-black text-sm mb-2">Stay Organized</h3>
+            <p className="text-xs text-[#545454]">
+              Manage assignments with weighted category averages
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -153,15 +232,22 @@ function SettingsModal({ gradeScale, onScaleChange, onClose, onReset }) {
  * Main Dashboard Component
  */
 export function Dashboard() {
+  const { signOut } = useAuth();
   const {
     categories,
-    setCategories,
     targetGrade,
-    setTargetGrade,
     gradeScale,
-    setGradeScale,
+    loading,
+    error,
+    addCategory,
+    updateCategory,
+    deleteCategory,
+    addAssignment,
+    updateAssignment,
+    deleteAssignment,
+    updateSettings,
     resetAllData
-  } = useGradePilotStore();
+  } = useSupabaseGrades();
 
   const {
     totalWeight,
@@ -179,33 +265,123 @@ export function Dashboard() {
 
   const [showSettings, setShowSettings] = useState(false);
 
+  // Show loading skeleton while fetching data
+  if (loading) {
+    return <DashboardSkeleton />;
+  }
+
+  // Show error toast if there's an error
+  if (error) {
+    console.error('Dashboard error:', error);
+  }
+
   // Category CRUD operations
-  const handleAddCategory = () => {
-    const newCategory = {
-      id: `cat_${Date.now()}`,
-      name: 'New Category',
-      weight: 0,
-      assignments: []
-    };
-    setCategories([...categories, newCategory]);
-  };
-
-  const handleUpdateCategory = (index, updatedCategory) => {
-    const newCategories = [...categories];
-    newCategories[index] = updatedCategory;
-    setCategories(newCategories);
-  };
-
-  const handleDeleteCategory = (index) => {
-    if (window.confirm('Delete this category and all its assignments?')) {
-      setCategories(categories.filter((_, i) => i !== index));
+  const handleAddCategory = async () => {
+    try {
+      await addCategory('New Category', 0);
+    } catch (err) {
+      console.error('Failed to add category:', err);
     }
   };
 
-  const handleResetAll = () => {
+  const handleUpdateCategory = async (category, updates) => {
+    try {
+      // Update category itself
+      if (updates.name !== category.name || updates.weight !== category.weight) {
+        await updateCategory(category.id, {
+          name: updates.name,
+          weight: updates.weight
+        });
+      }
+
+      // Handle assignment updates
+      if (updates.assignments) {
+        // Find new assignments (without id or with temp id)
+        const newAssignments = updates.assignments.filter(
+          a => !category.assignments.some(ca => ca.id === a.id)
+        );
+        
+        // Find updated assignments
+        const updatedAssignments = updates.assignments.filter(
+          a => category.assignments.some(ca => ca.id === a.id)
+        );
+
+        // Find deleted assignments
+        const deletedAssignments = category.assignments.filter(
+          a => !updates.assignments.some(ua => ua.id === a.id)
+        );
+
+        // Add new assignments
+        for (const assignment of newAssignments) {
+          await addAssignment(category.id, assignment.name, assignment.pointsPossible);
+        }
+
+        // Update existing assignments
+        for (const assignment of updatedAssignments) {
+          const oldAssignment = category.assignments.find(a => a.id === assignment.id);
+          if (
+            oldAssignment.name !== assignment.name ||
+            oldAssignment.pointsEarned !== assignment.pointsEarned ||
+            oldAssignment.pointsPossible !== assignment.pointsPossible
+          ) {
+            await updateAssignment(assignment.id, assignment);
+          }
+        }
+
+        // Delete removed assignments
+        for (const assignment of deletedAssignments) {
+          await deleteAssignment(assignment.id, category.id);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to update category:', err);
+    }
+  };
+
+  const handleDeleteCategory = async (categoryId) => {
+    if (window.confirm('Delete this category and all its assignments?')) {
+      try {
+        await deleteCategory(categoryId);
+      } catch (err) {
+        console.error('Failed to delete category:', err);
+      }
+    }
+  };
+
+  const handleTargetChange = async (newTarget) => {
+    try {
+      await updateSettings(newTarget, gradeScale);
+    } catch (err) {
+      console.error('Failed to update target:', err);
+    }
+  };
+
+  const handleGradeScaleChange = async (newScale) => {
+    try {
+      await updateSettings(targetGrade, newScale);
+    } catch (err) {
+      console.error('Failed to update grade scale:', err);
+    }
+  };
+
+  const handleResetAll = async () => {
     if (window.confirm('This will delete all your data. Are you sure?')) {
-      resetAllData();
-      setShowSettings(false);
+      try {
+        await resetAllData();
+        setShowSettings(false);
+      } catch (err) {
+        console.error('Failed to reset data:', err);
+      }
+    }
+  };
+
+  const handleSignOut = async () => {
+    if (window.confirm('Are you sure you want to sign out?')) {
+      try {
+        await signOut();
+      } catch (err) {
+        console.error('Failed to sign out:', err);
+      }
     }
   };
 
@@ -216,9 +392,6 @@ export function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#FFFFFF]">
-      {/* Weight Check Bar */}
-      <WeightCheckBar totalWeight={totalWeight} isValid={isWeightValid} />
-
       {/* Header */}
       <header className="border-b border-[#EEEEEE] px-4 lg:px-8 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -241,39 +414,48 @@ export function Dashboard() {
             >
               <Settings size={20} className="text-[#000000]" />
             </button>
+            <button
+              onClick={handleSignOut}
+              className="p-2 hover:bg-[#EEEEEE] rounded transition-colors"
+              aria-label="Sign out"
+            >
+              <LogOut size={20} className="text-[#545454]" />
+            </button>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 lg:px-8 py-8">
+        {/* Setup Progress Card */}
+        <SetupProgressCard totalWeight={totalWeight} isValid={isWeightValid} />
+
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Left Column - Categories */}
+          {/* Left Column - Stats & Categories */}
           <div className="lg:col-span-2 space-y-6">
             {/* Stats Row */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <StatCard 
                 label="Current Grade" 
                 value={currentGrade !== null ? currentGrade.toFixed(1) : '—'}
                 suffix={currentGrade !== null ? '%' : ''}
                 highlight={currentGrade >= 90}
+                large={true}
+                showProgress={currentGrade !== null}
+                progressValue={currentGrade || 0}
               />
-              <StatCard 
-                label="Letter Grade" 
-                value={currentLetterGrade}
-                highlight={currentLetterGrade === 'A'}
-              />
-              <StatCard 
-                label="Weight Used" 
-                value={weightUsed.toFixed(0)}
-                suffix="%"
-                subtext={`${remainingWeight.toFixed(0)}% remaining`}
-              />
-              <StatCard 
-                label="Categories" 
-                value={categories.length}
-                subtext={`${categories.reduce((sum, c) => sum + (c.assignments?.length || 0), 0)} assignments`}
-              />
+              <div className="grid grid-cols-2 gap-4">
+                <StatCard 
+                  label="Letter" 
+                  value={currentLetterGrade}
+                  highlight={currentLetterGrade === 'A'}
+                />
+                <StatCard 
+                  label="Weight Used" 
+                  value={weightUsed.toFixed(0)}
+                  suffix="%"
+                />
+              </div>
             </div>
 
             {/* Categories Header */}
@@ -281,7 +463,7 @@ export function Dashboard() {
               <h2 className="text-lg font-black">Course Categories</h2>
               <button
                 onClick={handleAddCategory}
-                className="btn-primary rounded text-sm inline-flex items-center gap-2 py-2 px-4"
+                className="border-2 border-[#000000] bg-transparent text-[#000000] hover:bg-[#000000] hover:text-white transition-colors rounded text-sm font-bold inline-flex items-center gap-2 py-2 px-4"
               >
                 <Plus size={14} />
                 Add Category
@@ -290,23 +472,23 @@ export function Dashboard() {
 
             {/* Category Cards */}
             <div className="space-y-4">
-              {categories.map((category, index) => (
+              {categories.map((category) => (
                 <CategoryCard
                   key={category.id}
                   category={category}
-                  onUpdate={(updated) => handleUpdateCategory(index, updated)}
-                  onDelete={() => handleDeleteCategory(index)}
+                  onUpdate={(updated) => handleUpdateCategory(category, updated)}
+                  onDelete={() => handleDeleteCategory(category.id)}
                   categoryGrade={calculateCategoryGrade(category)}
                 />
               ))}
             </div>
           </div>
 
-          {/* Right Column - Forecast */}
+          {/* Right Column - Forecast (More Prominent) */}
           <div className="space-y-6">
             <GradeForecast
               targetGrade={targetGrade}
-              onTargetChange={setTargetGrade}
+              onTargetChange={handleTargetChange}
               requiredAverage={requiredAverage}
               isTargetAchievable={isTargetAchievable}
               currentGrade={currentGrade}
@@ -345,7 +527,7 @@ export function Dashboard() {
       {showSettings && (
         <SettingsModal
           gradeScale={gradeScale}
-          onScaleChange={setGradeScale}
+          onScaleChange={handleGradeScaleChange}
           onClose={() => setShowSettings(false)}
           onReset={handleResetAll}
         />

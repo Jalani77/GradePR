@@ -1,4 +1,5 @@
-import { Target, TrendingUp, TrendingDown, AlertCircle, CheckCircle } from 'lucide-react';
+import { useState } from 'react';
+import { Target, TrendingUp, TrendingDown, AlertCircle, CheckCircle, Shield } from 'lucide-react';
 
 /**
  * Grade Forecast Engine - "What-If" Calculator
@@ -14,6 +15,8 @@ export function GradeForecast({
   forecast,
   gradeScale
 }) {
+  // What-If slider state
+  const [whatIfScore, setWhatIfScore] = useState(100);
   
   // Get grade letter for target
   const getTargetLetter = (target) => {
@@ -24,6 +27,46 @@ export function GradeForecast({
     return 'F';
   };
 
+  // Get current letter grade
+  const getCurrentLetter = (grade) => {
+    if (grade === null) return '-';
+    return getTargetLetter(grade);
+  };
+
+  // Calculate safety margin - how many points before dropping to next grade
+  const calculateSafetyMargin = () => {
+    if (currentGrade === null) return null;
+    
+    const currentLetter = getCurrentLetter(currentGrade);
+    let nextThreshold;
+    
+    if (currentLetter === 'A') nextThreshold = gradeScale.B;
+    else if (currentLetter === 'B') nextThreshold = gradeScale.C;
+    else if (currentLetter === 'C') nextThreshold = gradeScale.D;
+    else if (currentLetter === 'D') nextThreshold = 0;
+    else return null;
+    
+    const margin = currentGrade - nextThreshold;
+    return margin > 0 ? margin : null;
+  };
+
+  const safetyMargin = calculateSafetyMargin();
+
+  // Calculate what-if scenario - what would grade be if you score X on remaining
+  const calculateWhatIf = (score) => {
+    if (currentGrade === null || remainingWeight <= 0) return currentGrade;
+    
+    // Current weighted points
+    const currentPoints = (currentGrade * (100 - remainingWeight)) / 100;
+    // Points from remaining at given score
+    const remainingPoints = (score * remainingWeight) / 100;
+    // Final grade
+    return currentPoints + remainingPoints;
+  };
+
+  const whatIfResult = calculateWhatIf(whatIfScore);
+  const requiredForTarget = requiredAverage;
+
   // Preset target buttons
   const presets = [
     { label: 'A', value: gradeScale.A },
@@ -33,15 +76,15 @@ export function GradeForecast({
   ];
 
   return (
-    <div className="card rounded p-5">
+    <div className="card rounded-lg p-6 shadow-lg">
       {/* Header */}
-      <div className="flex items-center gap-2 mb-5">
-        <Target size={16} className="text-[#000000]" />
-        <h2 className="text-sm font-black uppercase tracking-wide">Grade Forecast</h2>
+      <div className="flex items-center gap-2 mb-6">
+        <Target size={18} className="text-[#000000]" />
+        <h2 className="text-base font-black uppercase tracking-wide">Grade Forecast</h2>
       </div>
 
       {/* Target Input */}
-      <div className="mb-5">
+      <div className="mb-6">
         <label className="block text-xs font-semibold text-[#545454] uppercase tracking-wide mb-2">
           Target Grade
         </label>
@@ -150,6 +193,78 @@ export function GradeForecast({
           </div>
         )}
       </div>
+
+      {/* What-If Slider */}
+      {remainingWeight > 0 && currentGrade !== null && (
+        <div className="border-t border-[#EEEEEE] pt-5 mt-5">
+          <label className="block text-xs font-semibold text-[#545454] uppercase tracking-wide mb-3">
+            What-If Simulator
+          </label>
+          
+          <div className="space-y-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-[#545454]">Score on Remaining:</span>
+              <span className="font-mono-grades text-lg font-black">{whatIfScore.toFixed(0)}%</span>
+            </div>
+            
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              value={whatIfScore}
+              onChange={(e) => setWhatIfScore(parseFloat(e.target.value))}
+              className="w-full h-2 bg-[#EEEEEE] rounded-lg appearance-none cursor-pointer accent-[#276EF1]"
+            />
+            
+            <div className="bg-[#F0F4FF] p-4 rounded-lg">
+              <div className="text-xs text-[#545454] mb-1">Final Grade</div>
+              <div className="flex items-center justify-between">
+                <span className="font-mono-grades text-3xl font-black text-[#276EF1]">
+                  {whatIfResult !== null ? whatIfResult.toFixed(1) : '—'}%
+                </span>
+                <span className="text-2xl font-black">
+                  {whatIfResult !== null ? getTargetLetter(whatIfResult) : '-'}
+                </span>
+              </div>
+              {requiredForTarget !== null && (
+                <div className="mt-2 text-xs text-[#64748B]">
+                  {whatIfScore >= requiredForTarget 
+                    ? '✓ Meets target goal' 
+                    : `Need ${(requiredForTarget - whatIfScore).toFixed(1)}% more to hit target`
+                  }
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Safety Margin */}
+      {safetyMargin !== null && (
+        <div className="border-t border-[#EEEEEE] pt-5 mt-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Shield size={14} className="text-[#05A357]" />
+            <label className="text-xs font-semibold text-[#545454] uppercase tracking-wide">
+              Safety Margin
+            </label>
+          </div>
+          
+          <div className="bg-[#F0F7F4] p-4 rounded-lg">
+            <div className="font-mono-grades text-2xl font-black text-[#05A357] mb-1">
+              {safetyMargin.toFixed(1)}%
+            </div>
+            <p className="text-xs text-[#545454]">
+              You can drop this many points before falling to {
+                getCurrentLetter(currentGrade) === 'A' ? 'a B' :
+                getCurrentLetter(currentGrade) === 'B' ? 'a C' :
+                getCurrentLetter(currentGrade) === 'C' ? 'a D' :
+                'failing'
+              }
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Best/Worst Case Scenario */}
       {forecast && remainingWeight > 0 && (

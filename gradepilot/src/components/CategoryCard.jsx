@@ -121,8 +121,16 @@ export function CategoryCard({ category, onUpdate, onDelete, categoryGrade }) {
   const assignments = category.assignments || [];
   const gradedCount = assignments.filter(a => a.pointsEarned !== null && a.pointsEarned !== '').length;
 
+  // Determine grade color based on conditional styling
+  const getGradeColor = (grade) => {
+    if (grade === null) return 'text-[#CCCCCC]';
+    if (grade > 90) return 'text-[#05A357]'; // Green for >90%
+    if (grade < 70) return 'text-[#F59E0B]'; // Soft orange for <70%
+    return 'text-[#000000]'; // Default black for 70-90%
+  };
+
   return (
-    <div className="card rounded">
+    <div className="card rounded-lg hover:shadow-md transition-all duration-200 group">
       {/* Category Header */}
       <div className="flex items-center gap-3 p-4 border-b border-[#EEEEEE]">
         <button 
@@ -158,14 +166,10 @@ export function CategoryCard({ category, onUpdate, onDelete, categoryGrade }) {
         </div>
 
         <div className="flex items-center gap-4">
-          {/* Category grade */}
+          {/* Category grade with conditional coloring */}
           <div className="text-right">
             {categoryGrade !== null ? (
-              <span className={`font-mono-grades text-lg font-black ${
-                categoryGrade >= 90 ? 'text-[#05A357]' : 
-                categoryGrade >= 80 ? 'text-[#276EF1]' : 
-                categoryGrade >= 70 ? 'text-[#545454]' : 'text-[#E11D48]'
-              }`}>
+              <span className={`font-mono-grades text-lg font-black ${getGradeColor(categoryGrade)}`}>
                 {categoryGrade.toFixed(1)}%
               </span>
             ) : (
@@ -180,7 +184,7 @@ export function CategoryCard({ category, onUpdate, onDelete, categoryGrade }) {
 
           <button
             onClick={onDelete}
-            className="p-2 hover:bg-[#EEEEEE] rounded transition-colors"
+            className="p-2 hover:bg-[#EEEEEE] rounded transition-colors opacity-0 group-hover:opacity-100"
             aria-label="Delete category"
           >
             <Trash2 size={16} className="text-[#545454]" />
@@ -208,14 +212,16 @@ export function CategoryCard({ category, onUpdate, onDelete, categoryGrade }) {
             </div>
           )}
 
-          {/* Add Assignment Button */}
-          <button
-            onClick={handleAddAssignment}
-            className="w-full flex items-center justify-center gap-2 p-3 text-sm font-semibold text-[#545454] hover:bg-[#FAFAFA] border-t border-[#EEEEEE] transition-colors"
-          >
-            <Plus size={14} />
-            Add Assignment
-          </button>
+          {/* Add Assignment Button - Icon Only */}
+          <div className="border-t border-[#EEEEEE] p-3 flex justify-end">
+            <button
+              onClick={handleAddAssignment}
+              className="w-8 h-8 rounded-full bg-[#FAFAFA] hover:bg-[#000000] hover:text-white text-[#545454] transition-all duration-200 flex items-center justify-center shadow-sm hover:shadow-md"
+              aria-label="Add assignment"
+            >
+              <Plus size={16} />
+            </button>
+          </div>
         </div>
       )}
     </div>
